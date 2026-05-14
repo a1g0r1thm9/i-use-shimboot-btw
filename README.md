@@ -30,7 +30,7 @@ Shimboot is a collection of scripts for patching a Chrome OS RMA shim to serve a
 - Works on enterprise enrolled devices
 - Can boot Chrome OS with no restrictions (useful for enrolled devices)
 - Nearly full device compatibility
-- Optional disk compression 
+- Optional disk compression and encryption
 - Multiple desktop environments supported
 
 ## About:
@@ -53,27 +53,31 @@ The main advantages of this approach are that you don't need to touch the device
 Note that rootfs partitions have to be named `shimboot_rootfs:<partname>` for the bootloader to recognize them.
 
 ## Status:
-Driver support depends on the device you are using shimboot on. The `patch_rootfs.sh` script attempts to copy all the firmware and drivers from the shim and recovery image into the rootfs, so expect most things to work on other boards. ARM Chromebooks are not supported at the moment.
+Driver support depends on the device you are using shimboot on. The `patch_rootfs.sh` script attempts to copy all the firmware and drivers from the shim and recovery image into the rootfs, so expect most things to work on other boards. Both x86_64 and ARM64 chromebooks are supported.
 
 ### Device Compatibility Table:
-| Board Name                                       | X11               | Wifi              | Speakers | Backlight | Touchscreen | 3D Accel | Bluetooth | Webcam   |
-|------------------------------------------------  |-------------------|-------------------|----------|-----------|-------------|----------|-----------|----------|
-| [`dedede`](https://chrome100.dev/board/dedede)   | yes               | yes               | no       | yes       | yes         | yes      | yes       | yes      |
-| [`octopus`](https://chrome100.dev/board/octopus) | yes               | yes               | yes      | yes       | yes         | yes      | yes       | yes      |
-| [`nissa`](https://chrome100.dev/board/nissa)     | yes               | yes               | no       | yes       | yes         | yes      | yes       | yes      |
-| [`reks`](https://chrome100.dev/board/reks)       | no<sup>[1]</sup>  | yes               | untested | untested  | untested    | no       | untested  | untested |
-| [`kefka`](https://chrome100.dev/board/kefka)     | no<sup>[1]</sup>  | yes               | yes      | yes       | untested    | no       | untested  | untested |
-| [`zork`](https://chrome100.dev/board/zork)       | yes               | yes               | no       | untested  | yes         | yes      | yes       | yes      |
-| [`grunt`](https://chrome100.dev/board/grunt)     | yes<sup>[4]</sup> | yes<sup>[3]</sup> | no       | yes       | yes         | yes      | yes       | yes      |
-| [`jacuzzi`](https://chrome100.dev/board/jacuzzi) | yes               | yes               | no       | yes       | untested    | no       | no        | yes      |
-| [`corsola`](https://chrome100.dev/board/corsola) | yes               | yes               | untested | yes       | untested    | no       | yes       | untested |
-| [`hatch`](https://chrome100.dev/board/hatch)     | yes               | yes<sup>[2]</sup> | no       | yes       | yes         | yes      | yes       | yes      |
-| [`snappy`](https://chrome100.dev/board/snappy)   | yes               | yes               | yes      | yes       | yes         | yes      | yes       | yes      |
+| Board Name                                          | X11               | Wifi              | Speakers | Backlight | Touchscreen | 3D Accel          | Bluetooth | Webcam   |
+|-----------------------------------------------------|-------------------|-------------------|----------|-----------|-------------|-------------------|-----------|----------|
+| [`dedede`](https://cros.download/recovery/dedede)   | yes               | yes               | no       | yes       | yes         | yes               | yes       | yes      |
+| [`octopus`](https://cros.download/recovery/octopus) | yes               | yes               | yes      | yes       | yes         | yes               | yes       | yes      |
+| [`nissa`](https://cros.download/recovery/nissa)     | yes               | yes               | no       | yes       | yes         | yes               | yes       | yes      |
+| [`reks`](https://cros.download/recovery/reks)       | no<sup>[1]</sup>  | yes               | untested | untested  | untested    | no                | untested  | untested |
+| [`kefka`](https://cros.download/recovery/kefka)     | no<sup>[1]</sup>  | yes               | yes      | yes       | untested    | no                | untested  | untested |
+| [`zork`](https://cros.download/recovery/zork)       | yes               | yes               | no       | yes       | yes         | yes               | yes       | yes      |
+| [`grunt`](https://cros.download/recovery/grunt)     | yes<sup>[4]</sup> | yes<sup>[3]</sup> | no       | yes       | yes         | yes               | yes       | yes      |
+| [`jacuzzi`](https://cros.download/recovery/jacuzzi) | yes               | yes               | no       | yes       | untested    | no                | no        | yes      |
+| [`corsola`](https://cros.download/recovery/corsola) | yes               | yes               | no       | yes       | yes         | yes<sup>[5]</sup> | yes       | yes      |
+| [`hatch`](https://cros.download/recovery/hatch)     | yes               | yes<sup>[2]</sup> | no       | yes       | yes         | yes               | yes       | yes      |
+| [`snappy`](https://cros.download/recovery/snappy)   | yes               | yes               | yes      | yes       | yes         | yes               | yes       | yes      |
+| [`hana`](https://cros.download/recovery/hana)       | yes<sup>[5]</sup> | yes               | no       | yes       | untested    | yes               | yes       | no       |
+| [`brya`](https://cros.download/recovery/brya)       | yes               | yes               | no       | yes       | untested    | yes               | yes       | yes      |
+| [`trogdor`](https://cros.download/recovery/trogdor) | yes               | no                | no       | yes       | untested    | yes               | untested  | untested |
 
 <sup>1. The kernel is too old.</sup><br>
 <sup>2. 5ghz wifi networks do not work, but 2.4ghz networks do.</sup><br>
-<sup>3. You may need to compile the wifi driver from source. See issue #69.</sup><br>
-<sup>4. X11 and LightDM might have some graphical issues.</sup>
+<sup>3. You may need to compile the wifi driver from source. See [#69](https://github.com/ading2210/shimboot/issues/69) and [#317](https://github.com/ading2210/shimboot/issues/317).</sup><br>
+<sup>4. X11 and LightDM might have some graphical issues.</sup><br>
+<sup>5. You need to use Wayland instead of X11.</sup>
 
 This table is incomplete. If you want to contribute a device compatibility report please create a new issue on the Github repository.
 
@@ -85,10 +89,10 @@ On all devices, the following features will not work:
 - Suspend (disabled by the kernel)
 - Swap (disabled by the kernel)
 
+A possible workaround for audio issues is using a USB sound card. Certain "USB to headphone jack" adapters are complete sound cards, which are supported by Linux. See [issue #234](https://github.com/ading2210/shimboot/issues/234).
+
 ### TODO:
 - Finish Python TUI rewrite (see the `python` branch if you want to help with this)
-- Transparent disk compression
-- Full disk encryption
 - Support for more distros (Ubuntu and Arch maybe)
 - Eliminate binwalk dependency
 - Get audio to work on dedede
@@ -99,12 +103,12 @@ PRs and contributions are welcome to help implement these features.
 ## Usage:
 
 ### Prerequisites:
-- A separate Linux PC for the build process (preferably something Debian-based)
+- If building from source, a separate Linux PC for the build process (preferably something Debian-based)
   - WSL2 is supported if you are on Windows
   - Github Codespaces is not supported at the moment
+  - At least 20GB of free disk space is needed on the build device
 - A USB drive that is at least 8GB in size
   - Cheap USB 2.0 drives typically won't work well due to their slow speeds
-- At least 20GB of free disk space
 
 ### Video Tutorial:
 [![thumbnail of the tutorial youtube video](https://img.youtube.com/vi/v327np19RXg/mqdefault.jpg)](https://www.youtube.com/watch?v=v327np19RXg)
@@ -112,7 +116,7 @@ PRs and contributions are welcome to help implement these features.
 [@blueiceyt](https://www.youtube.com/channel/UC2yMjQu-NwJSQb0tRclQMYg) made a nice [video tutorial](https://www.youtube.com/watch?v=v327np19RXg) for Shimboot. It's a lot easier to understand than the instructions on this page, and it'll cover most use cases.
 
 ### Build Instructions:
-1. Find the board name of your Chromebook. You can search for the model name on [chrome100.dev](https://chrome100.dev/).
+1. Find the board name of your Chromebook. You can search for the model name on [cros.download](https://cros.download/recovery).
 2. Clone this repository and cd into it.
 3. Run `sudo ./build_complete.sh <board_name>` to download the required data and build the disk image. 
 
@@ -121,7 +125,7 @@ Note: If you are building for an ARM Chromebook, you need the `qemu-user-static`
 [Prebuilt images](https://github.com/ading2210/shimboot/releases) are available if you don't have a suitable device to run the build on.
 
 <details>
-  <summary><b>Alternatively, you can run each of the steps manually:</b></summary>
+  <summary><b>(not recommended) Alternatively, you can run each of the steps manually:</b></summary>
   
   1. Grab a Chrome OS RMA Shim from somewhere. Most of them have already been leaked and aren't too difficult to find.
   2. Download a Chrome OS [recovery image](https://chromiumdash.appspot.com/serving-builds?deviceCategory=ChromeOS) for your board.
@@ -140,6 +144,8 @@ Note: If you are building for an ARM Chromebook, you need the `qemu-user-static`
 5. Boot into Debian and log in with the username and password that you configured earlier. The default username/password for the prebuilt images is `user/user`.
 6. Expand the rootfs partition so that it fills up the entire disk by running `sudo expand_rootfs`.
 7. Change your own password by running `passwd user`. The root user is disabled by default.
+8. Set up locales by running `sudo dpkg-reconfigure locales`
+9. Change the timezone if needed by running `sudo dpkg-reconfigure tzdata`
 
 ## FAQ:
 
@@ -147,15 +153,19 @@ Note: If you are building for an ARM Chromebook, you need the `qemu-user-static`
 Using any Linux distro is possible, provided that you apply the [proper patches](https://github.com/ading2210/chromeos-systemd) to systemd and recompile it. Most distros have some sort of bootstrapping tool that allows you to install it to a directory on your host PC. Then, you can just pass that rootfs directory into `patch_rootfs.sh` and `build.sh`.
 
 Here is a list of distros that are supported out of the box:
-- Debian 12
-- Debian Unstable
+- Debian 12 (Bookworm)
+- Debian 13 (Trixie) - This is the default.
+- Debian Unstable (Sid)
 - Alpine Linux
 
 PRs to enable support for other distros are welcome. 
 
-Debian Sid (the rolling release version of Debian) is also supported if you just want newer packages, and you can install it by passing an argument to `build_complete.sh`: 
+Debian Sid (unstable rolling release) and Trixie (upcoming Debian 13 release) is also supported if you just want newer packages, and you can install it by passing an argument to `build_complete.sh`: 
 ```bash
 sudo ./build_complete.sh dedede release=unstable
+```
+```bash
+sudo ./build_complete.sh dedede release=trixie
 ```
 
 There is also experimental support for Alpine Linux. The Alpine disk image is about half the size compared to Debian, although some applications are missing. Pass the `distro=alpine` to use it:
@@ -194,6 +204,8 @@ You may need to change `i965` to `i915` (or `r100`/`r200` for AMD hardware), dep
 
 For ARM Chromebooks, you may have to tweak the [Xorg configuration](https://xkcd.com/963/) instead.
 
+You can also try switching between X11 and Wayland, but this requires a different desktop environment than XFCE.
+
 #### Can the rootfs be compressed to save space?
 Compressing the Debian rootfs with a squashfs is supported, and you can do this by running the regular Debian rootfs through `./build_squashfs.sh`. For example:
 ```bash
@@ -205,15 +217,6 @@ Any writes to the squashfs will persist, but they will not be compressed when sa
 
 On the regular XFCE4 image, this brings the rootfs size down to 1.2GB from 3.5GB.
 
-#### I can't connect to some wifi networks.
-You may have to run these commands in order to connect to certain networks:
-```
-$ nmcli connection edit <your connection name>
-> set 802-11-wireless-security.pmf disable
-> save
-> activate
-```
-
 #### Steam doesn't work.
 Steam should be installed using the `sudo apt install steam` command, however it doesn't work out of the box due to security features in the shim kernel preventing the `bwrap` library from working. See [issue #12](https://github.com/ading2210/shimboot/issues/26#issuecomment-2151893062) for more info. 
 
@@ -222,13 +225,79 @@ To get Steam running, install and run it normally. It will fail and show a messa
 #### I broke something and the system does not boot anymore.
 If the rootfs fails to boot normally, you may use the rescue mode in the bootloader to enter a shell so you can debug and fix things. You can enter this mode by typing in `rescue <selection>` in the bootloader prompt, replacing `<selection>` with the number that is displayed for your rootfs. For example, `rescue 3` will enter rescue mode for the third boot option (usually Debian).
 
+#### I see a bunch of 404 errors when I run `apt update`.
+This is normal and completely harmless. The Shimboot package repository does not sign its packages, and it doesn't include translation metadata. This is not required for the functionality of the repo, and can be ignored.
+
+#### I want to install another desktop without building an image myself.
+You can replace the desktop environment in your existing Shimboot installation easily, using APT. For example:
+```bash
+sudo apt install task-cinnamon-desktop *xfce*- thunar- --autoremove
+```
+Replace `task-cinnamon-desktop` with the DE that you want to install (such as `task-kde-desktop`). This installs the other DE and uninstalls XFCE at the same time. Then once the installation has finished, reboot the system.
+
+#### My Chromebook is enrolled and it doesn't recognize the USB drive.
+Chromebooks that were manufactured after early 2023 contain a patch in the read-only firmware that prevents Shimboot from booting, even if you switch to dev mode. This only affects enrolled devices, and there is no workaround if your device is affected. 
+
+#### How can I encrypt my Shimboot USB?
+You can encrypt the root partition using the `luks` option when building the image. For instance:
+```bash
+sudo ./build_complete.sh corsola luks=1
+```
+The script will prompt you to set an encryption password. When booting the encrypted image, the Shimboot bootloader will prompt you to enter this password.
+
+#### I can't connect to some wifi networks.
+You may have to run these commands in order to connect to certain networks:
+```bash
+$ nmcli connection edit <your connection name>
+> set 802-11-wireless-security.pmf disable
+> save
+> activate
+```
+
+#### My binwalk version is unsupported.
+
+[Binwalk](https://github.com/ReFirmLabs/binwalk) is a tool that the Shimboot build scripts use to find and extract the initramfs from the shim kernel. Newer versions of binwalk (v3.x and higher) were rewritten in Rust for performance reasons. However, the new version is still feature incomplete and does not work for Shimboot's purposes. 
+
+Therefore, you need the older version of binwalk (v2.x) which was written in Python. To install it, run the following commands:
+
+```bash
+git clone https://salsa.debian.org/pkg-security-team/binwalk.git -b debian/2.4.3+dfsg1-2 --depth=1
+cd binwalk
+sudo python3 setup.py install
+```
+
+See the old [binwalk install instructions](https://salsa.debian.org/pkg-security-team/binwalk/-/blob/debian/2.4.3+dfsg1-2/INSTALL.md?ref_type=tags) for more information.
+
+#### How do I upgrade to a newer version of Debian?
+
+The process is similar to [an upgrade on a normal system](https://wiki.debian.org/DebianUpgrade), although be sure to keep any old files if prompted. Here's a quick rundown:
+
+1. Backup any important data in case of a failure. Ensure that you have lots of free disk space, otherwise you will likely end up with a broken system
+2. `sources.list`. Assuming an upgrade from Bookworm to Trixie, start by changing your `/etc/apt/sources.list` to replace `bookworm` with `trixie`:
+```
+deb [trusted=yes arch=amd64] https://shimboot.ading.dev/debian trixie main
+deb http://deb.debian.org/debian trixie main contrib non-free-firmware non-free
+```
+3. Run the following commands
+```bash
+sudo apt update
+sudo apt upgrade --without-new-pkgs
+sudo apt full-upgrade
+reboot
+```
+
 ## Copyright:
-Shimboot is licensed under the [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.txt). Unless otherwise indicated, all code has been written by me, [ading2210](https://github.com/ading2210).
+Shimboot is licensed under the [GNU GPL v3](https://www.gnu.org/licenses/gpl-3.0.txt). 
+
+Unless otherwise indicated, all code has been written by me, [ading2210](https://github.com/ading2210).
+
+Other contributors:
+- [@a1g0r1thm9](https://github.com/a1g0r1thm9) - LUKS2 encryption feature ([PR #300](https://github.com/ading2210/shimboot/pull/300))
 
 ### Copyright Notice:
 ```
 ading2210/shimboot: Boot desktop Linux from a Chrome OS RMA shim.
-Copyright (C) 2023 ading2210
+Copyright (C) 2025 ading2210
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

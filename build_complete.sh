@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ ! -x "./common.sh" ]; then
+  echo "error: other shell scripts are not executable. please clone this repository with the git command instead of downloading the .zip archive from the github website."
+  exit 1
+fi
+
 . ./common.sh
 . ./image_utils.sh
 
@@ -13,16 +18,16 @@ print_help() {
   echo "                   gnome, xfce, kde, lxde, gnome-flashback, cinnamon, mate, lxqt"
   echo "  data_dir     - The working directory for the scripts. This defaults to ./data"
   echo "  arch         - The CPU architecture to build the shimboot image for. Set this to 'arm64' if you have an ARM Chromebook."
-  echo "  release      - Set this to either 'bookworm' or 'unstable' to build for Debian stable/unstable."
-  echo "  distro       - The Linux distro to use. This should be either 'debian', 'ubuntu', or 'alpine'."
-  echo "  luks         - Set this to 'true' to enable full-drive encryption. Currently not available on arm64-based chromebooks."
+  echo "  release      - Set this to either 'bookworm', 'trixie', or 'unstable' to build for Debian 12, 13, or unstable."
+  echo "  distro       - The Linux distro to use. This should be either 'debian', 'ubuntu', 'arch' or 'alpine'."
+  echo "  luks         - Set this argument to encrypt the rootfs partition."
 }
 
 assert_root
 assert_args "$1"
 parse_args "$@"
 
-base_dir="$(realpath -m  $(dirname "$0"))"
+base_dir="$(realpath -m "$(dirname "$0")")"
 board="$1"
 
 compress_img="${args['compress_img']}"
@@ -33,7 +38,7 @@ data_dir="${args['data_dir']}"
 arch="${args['arch']-amd64}"
 release="${args['release']}"
 distro="${args['distro']-debian}"
-luks="${args['luks']-false}"
+luks="${args['luks']}"
 
 #a list of all arm board names
 arm_boards="
@@ -66,23 +71,42 @@ elif [ "$kernel_arch" = "aarch64" ]; then
   host_arch="arm64"
 fi
 
+if [ "$arch" == "arm64" ] && [ "distro" == "arch" ]; then
+  print_info "target architecture is arm64, but archlinux only supports x86_64. using archlinuxarm"
+fi
+
 needed_deps="wget python3 unzip zip git debootstrap cpio binwalk pcregrep cgpt mkfs.ext4 mkfs.ext2 fdisk depmod findmnt lz4 pv cryptsetup"
 if [ "$(check_deps "$needed_deps")" ]; then
-  #install deps automatically on debian and ubuntu
+  #install deps automatically on debian, arch and ubuntu
+  print_title "attempting to install build deps"
   if [ -f "/etc/debian_version" ]; then
-    print_title "attempting to install build deps"
-    apt-get install wget python3 unzip zip debootstrap cpio binwalk pcregrep cgpt kmod pv lz4 cryptsetup -y
+    apt-get install wget python3 unzip zip debootstrap cpio binwalk cgpt kmod pv lz4 cryptsetup -y
+    if apt-cache show pcre2-utils 2>/dev/null; then
+      apt-get install pcre2-utils -y
+    else
+      apt-get install pcregrep -y
+    fi
+    create_aliases
+  elif [ "$(pacman --help)" ]; then
+    pacman -Syu --needed --noconfirm wget python3 unzip zip debootstrap cpio binwalk kmod pv lz4 cryptsetup
+    if [ "$(check_deps "cgpt")" ]; then
+      #waiter waiter more unnecessary oneliners please
+      command -v yay >/dev/null 2>&1 && sudo -u "$SUDO_USER" yay -S --noconfirm cgpt-bin || (command -v paru >/dev/null 2>&1 && sudo -u "$SUDO_USER" paru -S --noconfirm cgpt-bin) || { print_error "install an aur helper you freak"; exit 1; }
+    fi
   fi
   assert_deps "$needed_deps"
 fi
 
-#install qemu-user-static on debian if needed
+#install qemu-user-static if needed
 if [ "$arch" != "$host_arch" ]; then
   if [ -f "/etc/debian_version" ]; then
     if ! dpkg --get-selections | grep -v deinstall | grep "qemu-user-static\|box64\|fex-emu" > /dev/null; then
       print_info "automatically installing qemu-user-static because we are building for a different architecture"
       apt-get install qemu-user-static binfmt-support -y
     fi
+  elif [ "$(pacman -h)" ]; then
+      print_info "automatically ensuring qemu-user-static because we are building for a different architecture"
+      pacman -S --needed --noconfirm qemu-user-static qemu-user-static-binfmt || print_error "could not install qemu-user-static"
   else 
     print_error "Warning: You are building an image for a different CPU architecture. It may fail if you do not have qemu-user-static installed."
     sleep 1
@@ -91,14 +115,14 @@ fi
 
 cleanup_path=""
 sigint_handler() {
-  if [ $cleanup_path ]; then
-    rm -rf $cleanup_path
+  if [ "$cleanup_path" ]; then
+    rm -rf "$cleanup_path"
   fi
   exit 1
 }
 trap sigint_handler SIGINT
 
-shim_url="https://dl.darkn.bio/api/raw/?path=/SH1mmer/$board.zip"
+shim_url="https://dl.cros.download/files/$board/$board.zip"
 boards_url="https://chromiumdash.appspot.com/cros/fetch_serving_builds?deviceCategory=ChromeOS"
 
 if [ -z "$data_dir" ]; then
@@ -108,7 +132,7 @@ else
 fi
 
 print_title "downloading list of recovery images"
-reco_url="$(wget -qO- --show-progress $boards_url | python3 -c '
+reco_url="$(wget -qO- --show-progress "$boards_url" | python3 -c '
 import json, sys
 
 all_builds = json.load(sys.stdin)
@@ -126,7 +150,7 @@ if "models" in board:
 
 reco_url = list(board["pushRecoveries"].values())[-1]
 print(reco_url)
-' $board)"
+' "$board")"
 print_info "found url: $reco_url"
 
 shim_bin="$data_dir/shim_$board.bin"
@@ -135,29 +159,35 @@ reco_bin="$data_dir/reco_$board.bin"
 reco_zip="$data_dir/reco_$board.zip"
 mkdir -p "$data_dir"
 
+extract_zip() {
+  local zip_path="$1"
+  local bin_path="$2"
+  cleanup_path="$bin_path"
+  print_info "extracting $zip_path"
+  local total_bytes="$(unzip -lq "$zip_path" | tail -1 | xargs | cut -d' ' -f1)"
+  if [ ! "$quiet" ]; then
+    unzip -p "$zip_path" | pv -s "$total_bytes" > "$bin_path"
+  else
+    unzip -p "$zip_path" > "$bin_path"
+  fi
+  rm -rf "$zip_path"
+  cleanup_path=""
+}
+
 download_and_unzip() {
   local url="$1"
   local zip_path="$2"
   local bin_path="$3"
   if [ ! -f "$bin_path" ]; then
     if [ ! "$quiet" ]; then
-      wget -q --show-progress $url -O $zip_path -c
+      wget -q --show-progress "$url" -O "$zip_path" -c
     else
-      wget -q $url -O $zip_path -c
+      wget -q "$url" -O "$zip_path" -c
     fi
   fi
 
   if [ ! -f "$bin_path" ]; then
-    cleanup_path="$bin_path"
-    print_info "extracting $zip_path"
-    local total_bytes="$(unzip -lq $zip_path | tail -1 | xargs | cut -d' ' -f1)"
-    if [ ! "$quiet" ]; then
-      unzip -p $zip_path | pv -s $total_bytes > $bin_path
-    else
-      unzip -p $zip_path > $bin_path
-    fi
-    rm -rf $zip_path
-    cleanup_path=""
+    extract_zip "$zip_path" "$bin_path"
   fi
 }
 
@@ -169,60 +199,78 @@ retry_cmd() {
 }
 
 print_title "downloading recovery image"
-download_and_unzip $reco_url $reco_zip $reco_bin
+download_and_unzip "$reco_url" "$reco_zip" "$reco_bin"
 
 print_title "downloading shim image"
-download_and_unzip $shim_url $shim_zip $shim_bin
+if [ ! -f "$shim_bin" ]; then
+  download_and_unzip "$shim_url" "$shim_zip" "$shim_bin"
+fi
 
 print_title "building $distro rootfs"
 if [ ! "$rootfs_dir" ]; then
-  desktop_package="task-$desktop-desktop"
-  rootfs_dir="$(realpath -m data/rootfs_$board)"
+  rootfs_dir="$(realpath -m "data/rootfs_$board")"
   if [ "$(findmnt -T "$rootfs_dir/dev")" ]; then
-    sudo umount -l $rootfs_dir/* 2>/dev/null || true
+    sudo umount -l "$rootfs_dir"/* 2>/dev/null || true
   fi
-  rm -rf $rootfs_dir
-  mkdir -p $rootfs_dir
+  rm -rf "$rootfs_dir"
+  mkdir -p "$rootfs_dir"
+  if [ "$distro" == "arch" ]; then
+    #something something arch package names > debian package names
+    if [ "$desktop" == "kde" ]; then
+      desktop="plasma"
+    elif [ "$desktop" == "xfce" ]; then
+      desktop="xfce4"
+    fi
+    desktop_package=$desktop
 
-  if [ "$distro" = "debian" ]; then
-    release="${release:-bookworm}"
-  elif [ "$distro" = "ubuntu" ]; then
-    release="${release:-noble}"
-  elif [ "$distro" = "alpine" ]; then
-    release="${release:-edge}"
+    #setup pacstrap
+    if [ -f "/etc/debian_version" ] && ! [ $(pacstrap -h) ]; then
+      apt-get install -y arch-install-scripts
+    elif [ "$(pacman -h)" ] && ! [ "$(pacstrap -h)" ]; then
+      pacman -S --needed --noconfirm arch-install-scripts
+    fi
+
+    release="rolling"
   else
-    print_error "invalid distro selection"
-    exit 1
-  fi
-
-  #install a newer debootstrap version if needed
-  if [ -f "/etc/debian_version" ] && [ "$distro" = "ubuntu" -o "$distro" = "debian" ]; then
-    if [ ! -f "/usr/share/debootstrap/scripts/$release" ]; then
-      print_info "installing newer debootstrap version"
-      mirror_url="https://deb.debian.org/debian/pool/main/d/debootstrap/"
-      deb_file="$(curl "https://deb.debian.org/debian/pool/main/d/debootstrap/" | pcregrep -o1 'href="(debootstrap_.+?\.deb)"' | tail -n1)"
-      deb_url="${mirror_url}${deb_file}"
-      wget -q --show-progress "$deb_url" -O "/tmp/$deb_file"
-      apt-get install -y "/tmp/$deb_file"
+    if [ "$distro" = "debian" ]; then
+      release="${release:-trixie}"
+    elif [ "$distro" = "ubuntu" ]; then
+      release="${release:-noble}"
+    elif [ "$distro" = "alpine" ]; then
+      release="${release:-edge}"
+    else
+      print_error "invalid distro selection"
+      exit 1
+    fi
+    desktop_package="task-$desktop-desktop"
+    #install a newer debootstrap version if needed
+    if [ -f "/etc/debian_version" ] && [ "$distro" = "ubuntu" -o "$distro" = "debian" ]; then
+      if [ ! -f "/usr/share/debootstrap/scripts/$release" ]; then
+        print_info "installing newer debootstrap version"
+        mirror_url="https://deb.debian.org/debian/pool/main/d/debootstrap/"
+        deb_file="$(wget -q -O - "https://deb.debian.org/debian/pool/main/d/debootstrap/" | pcregrep -o1 'href="(debootstrap_.+?\.deb)"' | tail -n1)"
+        deb_url="${mirror_url}${deb_file}"
+        wget -q --show-progress "$deb_url" -O "/tmp/$deb_file"
+        apt-get install -y "/tmp/$deb_file"
+      fi
     fi
   fi
-
-  ./build_rootfs.sh $rootfs_dir $release \
-    custom_packages=$desktop_package \
-    hostname=shimboot-$board \
-    username=user \
-    user_passwd=user \
-    arch=$arch \
-    distro=$distro
+  ./build_rootfs.sh "$rootfs_dir" "$release" \
+  custom_packages="$desktop_package" \
+  hostname="shimboot-$board" \
+  username=user \
+  user_passwd=user \
+  arch="$arch" \
+  distro="$distro"
 fi
 
 print_title "patching $distro rootfs"
-retry_cmd ./patch_rootfs.sh $shim_bin $reco_bin $rootfs_dir "quiet=$quiet"
+retry_cmd ./patch_rootfs.sh "$shim_bin" "$reco_bin" "$rootfs_dir" "quiet=$quiet"
 
 print_title "building final disk image"
 final_image="$data_dir/shimboot_$board.bin"
-rm -rf $final_image
-retry_cmd ./build.sh $final_image $shim_bin $rootfs_dir "quiet=$quiet" "arch=$arch" "name=$distro" "luks=$luks"
+rm -rf "$final_image"
+retry_cmd ./build.sh "$final_image" "$shim_bin" "$rootfs_dir" "quiet=$quiet" "arch=$arch" "name=$distro" "luks=$luks"
 print_info "build complete! the final disk image is located at $final_image"
 
 print_title "cleaning up"
@@ -231,7 +279,7 @@ clean_loops
 if [ "$compress_img" ]; then
   image_zip="$data_dir/shimboot_$board.zip"
   print_title "compressing disk image into a zip file"
-  zip -j $image_zip $final_image
+  zip -j "$image_zip" "$final_image"
   print_info "finished compressing the disk file"
   print_info "the finished zip file can be found at $image_zip" 
 fi
