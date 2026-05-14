@@ -23,9 +23,14 @@ arch="${10}"
 #enable shimboot services
 systemctl enable kill-frecon.service
 
+if [ "$arch" != "x86_64" ]; then
+  pacman-key --init
+  pacman-key --populate archlinuxarm
+fi
+
 #install base packages
 if [ ! "$disable_base_pkgs" ]; then
-  sudo pacman -S --needed --noconfirm cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
+  pacman -Syu --needed --noconfirm --disable-sandbox cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
 
   #set up zram
   echo "ALGO=lzo" >> /etc/default/zramswap
@@ -56,7 +61,7 @@ END
 if [ ! "$username" ]; then
   read -p "Enter the username for the user account: " username
 fi
-useradd -m -s /bin/bash -G sudo "$username"
+useradd -m -s /bin/bash -G wheel "$username"
 
 set_password() {
   local user="$1"

@@ -42,6 +42,8 @@ unmount_all() {
   for mountpoint in $chroot_mounts; do
     umount -l "$rootfs_dir/$mountpoint"
   done
+  umount "$rootfs_dir/etc/resolv.conf"
+  umount -l "$rootfs_dir/var/cache/pacman/pkg" 2>/dev/null
 }
 
 need_remount() {
@@ -114,10 +116,15 @@ elif [ "$distro" = "arch" ]; then
     grep -oE 'ArchLinuxARM-aarch64-latest\.tar\.gz' |
     head -n1
     )"
-
-    curl -fL "$alarm_mirror/os/$latest_tarball" -o "/tmp/rootfs.tar.gz"
+    if [ ! -f "/tmp/rootfs.tar.gz" ]; then
+      curl -fL "$alarm_mirror/os/$latest_tarball" -o "/tmp/rootfs.tar.gz"
+    fi
     bsdtar -xpf "/tmp/rootfs.tar.gz" -C "$rootfs_dir"
   fi
+  mkdir -p "$rootfs_dir/var/cache/pacman/pkg"
+  #sudo mkir -p /var/cache/pacman/pkg
+  #mount --bind /var/cache/pacman/pkg "$rootfs_dir/var/cache/pacman/pkg"
+  mount --bind "$rootfs_dir" "$rootfs_dir"
   chroot_script="/opt/setup_rootfs_arch.sh"
 else
   print_error "'$distro' is an invalid distro choice."
@@ -126,7 +133,7 @@ fi
 
 print_info "copying rootfs setup scripts"
 cp -arv rootfs/* "$rootfs_dir"
-cp /etc/resolv.conf "$rootfs_dir/etc/resolv.conf"
+mount --bind /etc/resolv.conf "$rootfs_dir/etc/resolv.conf"
 
 print_info "creating bind mounts for chroot"
 trap unmount_all EXIT
@@ -153,4 +160,3 @@ trap - EXIT
 unmount_all
 
 print_info "rootfs has been created"
-read
