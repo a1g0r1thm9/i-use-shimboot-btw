@@ -108,10 +108,6 @@ elif [ "$distro" = "arch" ]; then
   else
     #im sure theres a million better ways to do this
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
-    tmpdir="$(mktemp -d)"
-    trap 'rm -rf "$tmpdir"' EXIT
-
-    cd "$tmpdir"
 
     latest_tarball="$(
     curl -fsSL "$alarm_mirror/os/" |
@@ -119,8 +115,8 @@ elif [ "$distro" = "arch" ]; then
     head -n1
     )"
 
-    curl -fL "$alarm_mirror/os/$latest_tarball" -o rootfs.tar.gz
-    bsdtar -xpf rootfs.tar.gz -C "$rootfs_dir"
+    curl -fL "$alarm_mirror/os/$latest_tarball" -o "/tmp/rootfs.tar.gz"
+    bsdtar -xpf "/tmp/rootfs.tar.gz" -C "$rootfs_dir"
   fi
   chroot_script="/opt/setup_rootfs_arch.sh"
 else
