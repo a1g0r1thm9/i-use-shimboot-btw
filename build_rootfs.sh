@@ -94,7 +94,7 @@ elif [ "$distro" = "arch" ]; then
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
     tarfile="$(realpath .)/rootfs.tar.gz"
     if [ ! -f "$tarfile" ]; then
-      latest_tarball="$(wget -qO- "$alarm_mirror/os/" | grep -oE $tarfile | head -n1)"
+      latest_tarball="$(wget -qO- "$alarm_mirror/os/" | grep -oE 'ArchLinuxARM-aarch64-latest\.tar\.gz' | head -n1)"
       wget -q --show-progress "$alarm_mirror/os/$latest_tarball" -O "$tarfile"
     fi
     #alarm image has file attributes that dont play nice with gnu tar
