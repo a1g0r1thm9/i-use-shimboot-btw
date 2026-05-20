@@ -95,6 +95,7 @@ elif [ "$distro" = "arch" ]; then
       latest_tarball="$(wget -qO- "$arch_mirror/iso/latest/" | grep -oE 'archlinux-bootstrap-[0-9.]+-x86_64\.tar\.zst' | head -n1)"
       wget -q --show-progress "$arch_mirror/iso/latest/$latest_tarball" -O "$tarfile"
     fi
+    echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > "$rootfs_dir/etc/pacman.d/mirrorlist"
   else
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
     tarfile="$(realpath .)/rootfs.tar.gz"
