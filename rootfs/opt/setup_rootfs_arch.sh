@@ -25,7 +25,7 @@ arch="${10}"
 #enable shimboot services
 systemctl enable kill-frecon.service
 
-if [ "$arch" != "x86_64" ]; then
+if [ "$arch" == "arm64" ]; then
   pacman-key --init
   pacman-key --populate archlinuxarm
 fi
