@@ -20,17 +20,9 @@ assert_deps "cpio pcregrep realpath cgpt mkfs.ext4 mkfs.ext2 fdisk lz4 curl unzi
 assert_args "$3"
 parse_args "$@"
 
-binwalk_dir="$(realpath .)/binwalk-2.3.4"
-binwalk_zip="$(realpath .)/binwalk-src.zip"
-
 if ! supported_binwalk; then
   print_error "your version of binwalk is unsupported or not installed. fetching binwalk 2.3.4."
-  if [ ! -d "$binwalk_dir" ]; then
-    wget -q --show-progress "https://github.com/ReFirmLabs/binwalk/archive/refs/tags/v2.3.4.zip" -O "$binwalk_zip"
-    unzip -q "$binwalk_zip"
-    rm "$binwalk_zip"
-  fi
-  export PYTHONPATH="$binwalk_dir/src"
+  install_binwalk
 fi
 
 

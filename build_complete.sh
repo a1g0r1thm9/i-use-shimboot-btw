@@ -75,12 +75,12 @@ if [ "$arch" == "arm64" ] && [ "distro" == "arch" ]; then
   print_info "target architecture is arm64, but archlinux only supports x86_64. using archlinuxarm"
 fi
 
-needed_deps="wget python3 unzip zip git debootstrap cpio binwalk pcregrep cgpt mkfs.ext4 mkfs.ext2 fdisk depmod findmnt lz4 pv cryptsetup"
+needed_deps="wget unzip zip git debootstrap cpio binwalk pcregrep cgpt mkfs.ext4 mkfs.ext2 fdisk depmod findmnt lz4 pv cryptsetup python3.11"
 if [ "$(check_deps "$needed_deps")" ]; then
   #install deps automatically on debian, arch and ubuntu
   print_title "attempting to install build deps"
   if [ -f "/etc/debian_version" ]; then
-    apt-get install wget python3 unzip zip debootstrap cpio binwalk cgpt kmod pv lz4 cryptsetup libarchive-tools systemd-container -y
+    apt-get install wget unzip zip debootstrap cpio binwalk cgpt kmod pv lz4 cryptsetup libarchive-tools systemd-container python3.11 -y
     if apt-cache show pcre2-utils 2>/dev/null; then
       apt-get install pcre2-utils -y
     else
@@ -88,10 +88,10 @@ if [ "$(check_deps "$needed_deps")" ]; then
     fi
     create_aliases
   elif [ "$(pacman --help)" ]; then
-    pacman -Syu --needed --noconfirm wget python3 unzip zip debootstrap cpio binwalk kmod pv lz4 cryptsetup
-    if [ "$(check_deps "cgpt")" ]; then
+    pacman -Syu --needed --noconfirm wget unzip zip debootstrap cpio binwalk kmod pv lz4 cryptsetup
+    if [ "$(check_deps "cgpt python3.11")" ]; then
       #waiter waiter more unnecessary oneliners please
-      command -v yay >/dev/null 2>&1 && sudo -u "$SUDO_USER" yay -S --noconfirm cgpt-bin || (command -v paru >/dev/null 2>&1 && sudo -u "$SUDO_USER" paru -S --noconfirm cgpt-bin) || { print_error "install an aur helper you freak"; exit 1; }
+      command -v yay >/dev/null 2>&1 && sudo -u "$SUDO_USER" yay -S --noconfirm cgpt-bin python311 || (command -v paru >/dev/null 2>&1 && sudo -u "$SUDO_USER" paru -S --noconfirm cgpt-bin) || { print_error "install an aur helper you freak"; exit 1; }
     fi
   fi
   assert_deps "$needed_deps"

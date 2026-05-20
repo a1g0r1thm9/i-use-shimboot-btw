@@ -89,23 +89,26 @@ elif [ "$distro" = "alpine" ]; then
   chroot_script="/opt/setup_rootfs_alpine.sh"
 elif [ "$distro" = "arch" ]; then
   if [ "$arch" == "x86_64" -o "amd64" ]; then
-    pacstrap -K "$rootfs_dir" base
+    arch_mirror="https://mirror.rackspace.com/archlinux"
+    tarfile="$(realpath .)/rootfs-x86_64.tar.gz"
+    if [ ! -f "$tarfile" ]; then
+      latest_tarball="$(wget -qO- "$arch_mirror/iso/latest/" | grep -oE 'archlinux-bootstrap-[0-9.]+-x86_64\.tar\.zst' | head -n1)"
+      wget -q --show-progress "$arch_mirror/iso/latest/$latest_tarball" -O "$tarfile"
+    fi
   else
-    #im sure theres a million better ways to do this
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
     tarfile="$(realpath .)/rootfs.tar.gz"
     if [ ! -f "$tarfile" ]; then
       latest_tarball="$(wget -qO- "$alarm_mirror/os/" | grep -oE 'ArchLinuxARM-aarch64-latest\.tar\.gz' | head -n1)"
       wget -q --show-progress "$alarm_mirror/os/$latest_tarball" -O "$tarfile"
     fi
-    #alarm image has file attributes that dont play nice with gnu tar
-    bsdtar -xpf "$tarfile" --numeric-owner -C "$rootfs_dir"
-    #tar -xpf "$tarfile" --numeric-owner -C "$rootfs_dir"
-
-    chown root:root "$rootfs_dir/etc"
-    rm -f "$rootfs_dir/etc/resolv.conf"
-    touch "$rootfs_dir/etc/resolv.conf"
   fi
+  #alarm image has file attributes that dont play nice with gnu tar
+  bsdtar -xpf "$tarfile" --numeric-owner -C "$rootfs_dir" --strip-components=1
+
+  chown root:root "$rootfs_dir/etc"
+  rm -f "$rootfs_dir/etc/resolv.conf"
+  touch "$rootfs_dir/etc/resolv.conf"
   chroot_script="/opt/setup_rootfs_arch.sh"
 
 else

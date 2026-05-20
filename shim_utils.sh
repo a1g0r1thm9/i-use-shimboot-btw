@@ -3,7 +3,7 @@
 #utilties for reading shim disk images
 
 run_binwalk() {
-  binwalk_cmd="python3 -m binwalk"
+  binwalk_cmd="python3.11 -m binwalk"
   if ! $binwalk_cmd -h > /dev/null; then
     binwalk_cmd="binwalk"
   fi
@@ -12,6 +12,14 @@ run_binwalk() {
   else
     $binwalk_cmd "$@"
   fi
+}
+
+install_binwalk() {
+  binwalk_venv="$(realpath .)/binwalk-venv"
+  python3.11 -m venv "$binwalk_venv"
+  source "$binwalk_venv/bin/activate"
+  pip install imp
+  pip install -q "git+https://github.com/ReFirmLabs/binwalk.git@v2.3.4"
 }
 
 #binwalk 3.x and newer is not supported
