@@ -32,8 +32,12 @@ fi
 
 #install base packages
 if [ ! "$disable_base_pkgs" ]; then
-  pacman -Syu --needed --noconfirm --disable-sandbox cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
-
+  pacman -Syu --needed --noconfirm --disable-sandbox meson ninja cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
+  cd /opt/systemd-shimboot
+  useradd -m builder 2>/dev/null || true
+  chown -R builder:builder /opt/systemd-shimboot
+  sudo -u builder makepkg -s --noconfirm --skippgpcheck
+  pacman -U --noconfirm systemd-*.pkg.tar.zst
   #set up zram
   #echo "ALGO=lzo" >> /etc/default/zramswap
   #echo "PERCENT=100" >> /etc/default/zramswap

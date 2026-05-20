@@ -1,0 +1,40 @@
+pkgname=systemd
+pkgver=257.5
+pkgrel=1
+pkgdesc="systemd with shimboot mount patch"
+arch=('x86_64' 'aarch64')
+url="https://github.com/systemd/systemd"
+license=('LGPL2.1')
+provides=('systemd' 'libsystemd' 'systemd-libs')
+conflicts=('systemd-sysvcompat')
+source=(
+  "git+https://github.com/systemd/systemd-stable.git#tag=v${pkgver}"
+  "shimboot.patch::https://raw.githubusercontent.com/ading2210/chromeos-systemd/refs/heads/main/systemd_unstable.patch"
+)
+sha256sums=('SKIP' 'SKIP')
+
+prepare() {
+  cd systemd-stable
+  patch -p1 < ../shimboot.patch
+}
+
+build() {
+  cd systemd-stable
+  meson setup build \
+    --prefix=/usr \
+    --sysconfdir=/etc \
+    --localstatedir=/var \
+    --buildtype=release \
+    -Dmode=release \
+    -Dpamconfdir=no \
+    -Dpamlibdir=no \
+    -Drpmmacrosdir=no \
+    -Db_lto=true \
+    -Db_pie=true
+  ninja -C build
+}
+
+package() {
+  cd systemd-stable/build
+  DESTDIR="$pkgdir" ninja install
+}

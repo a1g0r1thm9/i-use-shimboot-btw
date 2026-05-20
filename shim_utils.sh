@@ -18,7 +18,6 @@ install_binwalk() {
   binwalk_venv="$(realpath .)/binwalk-venv"
   python3.11 -m venv "$binwalk_venv"
   source "$binwalk_venv/bin/activate"
-  pip install imp
   pip install -q "git+https://github.com/ReFirmLabs/binwalk.git@v2.3.4"
 }
 

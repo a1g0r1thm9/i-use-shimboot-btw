@@ -88,9 +88,8 @@ elif [ "$distro" = "alpine" ]; then
     --initdb add alpine-base
   chroot_script="/opt/setup_rootfs_alpine.sh"
 elif [ "$distro" = "arch" ]; then
-  if [ "$arch" == "x86_64" -o "amd64" ]; then
-    arch_mirror="https://mirror.rackspace.com/archlinux"
-    tarfile="$(realpath .)/rootfs-x86_64.tar.gz"
+  tarfile="$(realpath .)/rootfs-$arch.tar.gz"
+  if [ "$arch" == "x86_64" -o "$arch" == "amd64" ]; then    arch_mirror="https://mirror.rackspace.com/archlinux"
     if [ ! -f "$tarfile" ]; then
       latest_tarball="$(wget -qO- "$arch_mirror/iso/latest/" | grep -oE 'archlinux-bootstrap-[0-9.]+-x86_64\.tar\.zst' | head -n1)"
       wget -q --show-progress "$arch_mirror/iso/latest/$latest_tarball" -O "$tarfile"
@@ -99,7 +98,6 @@ elif [ "$distro" = "arch" ]; then
     echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > "$rootfs_dir/etc/pacman.d/mirrorlist"
   else
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
-    tarfile="$(realpath .)/rootfs.tar.gz"
     if [ ! -f "$tarfile" ]; then
       latest_tarball="$(wget -qO- "$alarm_mirror/os/" | grep -oE 'ArchLinuxARM-aarch64-latest\.tar\.gz' | head -n1)"
       wget -q --show-progress "$alarm_mirror/os/$latest_tarball" -O "$tarfile"
