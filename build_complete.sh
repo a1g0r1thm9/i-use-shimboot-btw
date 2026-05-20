@@ -80,6 +80,8 @@ if [ "$(check_deps "$needed_deps")" ]; then
   #install deps automatically on debian, arch and ubuntu
   print_title "attempting to install build deps"
   if [ -f "/etc/debian_version" ]; then
+    #dunno what else to do to get binwalk running easily
+    add-apt-repository ppa:deadsnakes/ppa
     apt-get install wget unzip zip debootstrap cpio binwalk cgpt kmod pv lz4 cryptsetup libarchive-tools systemd-container python3.11 -y
     if apt-cache show pcre2-utils 2>/dev/null; then
       apt-get install pcre2-utils -y
