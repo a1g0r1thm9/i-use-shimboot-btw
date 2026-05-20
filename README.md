@@ -157,6 +157,7 @@ Here is a list of distros that are supported out of the box:
 - Debian 13 (Trixie) - This is the default.
 - Debian Unstable (Sid)
 - Alpine Linux
+- Arch Linux
 
 PRs to enable support for other distros are welcome. 
 

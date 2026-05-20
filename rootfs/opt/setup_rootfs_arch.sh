@@ -9,6 +9,8 @@ if [ "$DEBUG" ]; then
   set -x
 fi
 
+trap "echo 'FAILED at line $LINENO: $BASH_COMMAND'" ERR
+
 release_name="$2"
 packages="$3"
 
@@ -33,8 +35,8 @@ if [ ! "$disable_base_pkgs" ]; then
   pacman -Syu --needed --noconfirm --disable-sandbox cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
 
   #set up zram
-  echo "ALGO=lzo" >> /etc/default/zramswap
-  echo "PERCENT=100" >> /etc/default/zramswap
+  #echo "ALGO=lzo" >> /etc/default/zramswap
+  #echo "PERCENT=100" >> /etc/default/zramswap
 
 fi
 
@@ -80,13 +82,16 @@ if [ "$enable_root" ]; then
   set_password root "$root_passwd"
 else
   usermod -a -G wheel "$username"
+  #best way to disable root lmao
+  set_password root "$(openssl rand -hex 20)"
 fi
 
 echo "Enter a user password:"
 set_password "$username" "$user_passwd"
 
 #clean pacman cache
-pacman -Sc --noconfirm
-
+pacman -Scc --noconfirm <<< "y
+y"
 #enable bash greeter
 echo "/usr/local/bin/shimboot_greeter" >> "/home/$username/.bashrc" 
+exit 0

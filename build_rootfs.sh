@@ -27,40 +27,22 @@ rootfs_dir=$(realpath -m "${1}")
 release_name="${2}"
 arch="${args['arch']-amd64}"
 distro="${args['distro']-debian}"
-chroot_mounts="proc sys dev run"
+indicator_file="$rootfs_dir/etc/shimboot-root-clean"
+
+if [ -f "$indicator_file" ]; then
+  print_info "rootfs appears to be already built"
+  exit 0
+fi
+
 if [ "$distro" == "arch" ]; then
   packages="${args['custom_packages']-xfce4}"
-  assert_deps "realpath pacstrap findmnt wget pcregrep tar"
+  assert_deps "realpath pacstrap findmnt wget pcregrep bsdtar"
 else
   packages="${args['custom_packages']-task-xfce-desktop}"
   assert_deps "realpath debootstrap findmnt wget pcregrep tar"
 fi
 
-mkdir -p $rootfs_dir
-
-unmount_all() {
-  for mountpoint in $chroot_mounts; do
-    umount -l "$rootfs_dir/$mountpoint"
-  done
-  umount "$rootfs_dir/etc/resolv.conf"
-  umount -l "$rootfs_dir/var/cache/pacman/pkg" 2>/dev/null
-}
-
-need_remount() {
-  local target="$1"
-  local mnt_options="$(findmnt -T "$target" | tail -n1 | rev | cut -f1 -d' '| rev)"
-  echo "$mnt_options" | grep -e "noexec" -e "nodev"
-}
-
-do_remount() {
-  local target="$1"
-  local mountpoint="$(findmnt -T "$target" | tail -n1 | cut -f1 -d' ')"
-  mount -o remount,dev,exec "$mountpoint"
-}
-
-if [ "$(need_remount "$rootfs_dir")" ]; then
-  do_remount "$rootfs_dir"
-fi
+mkdir -p "$rootfs_dir"
 
 if [ "$distro" = "debian" ]; then
   print_info "bootstrapping debian chroot"
@@ -110,22 +92,21 @@ elif [ "$distro" = "arch" ]; then
   else
     #im sure theres a million better ways to do this
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
-
-    latest_tarball="$(
-    curl -fsSL "$alarm_mirror/os/" |
-    grep -oE 'ArchLinuxARM-aarch64-latest\.tar\.gz' |
-    head -n1
-    )"
-    if [ ! -f "/tmp/rootfs.tar.gz" ]; then
-      curl -fL "$alarm_mirror/os/$latest_tarball" -o "/tmp/rootfs.tar.gz"
+    tarfile="$(realpath .)/rootfs.tar.gz"
+    if [ ! -f "$tarfile" ]; then
+      latest_tarball="$(wget -qO- "$alarm_mirror/os/" | grep -oE $tarfile | head -n1)"
+      wget -q --show-progress "$alarm_mirror/os/$latest_tarball" -O "$tarfile"
     fi
-    bsdtar -xpf "/tmp/rootfs.tar.gz" -C "$rootfs_dir"
+    #alarm image has file attributes that dont play nice with gnu tar
+    bsdtar -xpf "$tarfile" --numeric-owner -C "$rootfs_dir"
+    #tar -xpf "$tarfile" --numeric-owner -C "$rootfs_dir"
+
+    chown root:root "$rootfs_dir/etc"
+    rm -f "$rootfs_dir/etc/resolv.conf"
+    touch "$rootfs_dir/etc/resolv.conf"
   fi
-  mkdir -p "$rootfs_dir/var/cache/pacman/pkg"
-  #sudo mkir -p /var/cache/pacman/pkg
-  #mount --bind /var/cache/pacman/pkg "$rootfs_dir/var/cache/pacman/pkg"
-  mount --bind "$rootfs_dir" "$rootfs_dir"
   chroot_script="/opt/setup_rootfs_arch.sh"
+
 else
   print_error "'$distro' is an invalid distro choice."
   exit 1
@@ -133,13 +114,7 @@ fi
 
 print_info "copying rootfs setup scripts"
 cp -arv rootfs/* "$rootfs_dir"
-mount --bind /etc/resolv.conf "$rootfs_dir/etc/resolv.conf"
 
-print_info "creating bind mounts for chroot"
-trap unmount_all EXIT
-for mountpoint in $chroot_mounts; do
-  mount --make-rslave --rbind "/${mountpoint}" "${rootfs_dir}/$mountpoint"
-done
 
 hostname="${args['hostname']}"
 root_passwd="${args['root_passwd']}"
@@ -154,9 +129,13 @@ chroot_command="$chroot_script \
   '$user_passwd' '$enable_root' '$disable_base' \
   '$arch'"
 
-LC_ALL=C chroot $rootfs_dir /bin/sh -c "${chroot_command}"
+#share pacman cache w/ build host
+mkdir -p "/var/cache/pacman/pkg"
 
-trap - EXIT
-unmount_all
+#youtube.com/watch?v=02kGt4DEW30&t=30s
+systemd-nspawn -D "$rootfs_dir" --console=pipe \
+  --bind=/var/cache/pacman/pkg \
+  /bin/bash -c "${chroot_command}"
 
+touch "$indicator_file"
 print_info "rootfs has been created"
