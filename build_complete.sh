@@ -80,7 +80,7 @@ if [ "$(check_deps "$needed_deps")" ]; then
   #install deps automatically on debian, arch and ubuntu
   print_title "attempting to install build deps"
   if [ -f "/etc/debian_version" ]; then
-    apt-get install wget python3 unzip zip debootstrap cpio binwalk cgpt kmod pv lz4 cryptsetup libarchive-tools -y
+    apt-get install wget python3 unzip zip debootstrap cpio binwalk cgpt kmod pv lz4 cryptsetup libarchive-tools systemd-container -y
     if apt-cache show pcre2-utils 2>/dev/null; then
       apt-get install pcre2-utils -y
     else
@@ -212,7 +212,6 @@ if [ ! "$rootfs_dir" ]; then
   if [ "$(findmnt -T "$rootfs_dir/dev")" ]; then
     sudo umount -l "$rootfs_dir"/* 2>/dev/null || true
   fi
-  rm -rf "$rootfs_dir"
   mkdir -p "$rootfs_dir"
   if [ "$distro" == "arch" ]; then
     #something something arch package names > debian package names

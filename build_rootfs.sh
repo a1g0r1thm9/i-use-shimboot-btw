@@ -32,6 +32,9 @@ indicator_file="$rootfs_dir/etc/shimboot-root-clean"
 if [ -f "$indicator_file" ]; then
   print_info "rootfs appears to be already built"
   exit 0
+else
+  rm -fr "$rootfs_dir"
+  mkdir -p "$rootfs_dir"
 fi
 
 if [ "$distro" == "arch" ]; then
@@ -41,8 +44,6 @@ else
   packages="${args['custom_packages']-task-xfce-desktop}"
   assert_deps "realpath debootstrap findmnt wget pcregrep tar"
 fi
-
-mkdir -p "$rootfs_dir"
 
 if [ "$distro" = "debian" ]; then
   print_info "bootstrapping debian chroot"
@@ -137,5 +138,5 @@ systemd-nspawn -D "$rootfs_dir" --console=pipe \
   --bind=/var/cache/pacman/pkg \
   /bin/bash -c "${chroot_command}"
 
-touch "$indicator_file"
+echo clean > "$indicator_file"
 print_info "rootfs has been created"
