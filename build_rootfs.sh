@@ -88,7 +88,7 @@ elif [ "$distro" = "alpine" ]; then
     --initdb add alpine-base
   chroot_script="/opt/setup_rootfs_alpine.sh"
 elif [ "$distro" = "arch" ]; then
-  if [ "$arch" == "x86_64" ]; then
+  if [ "$arch" == "x86_64" -o "amd64" ]; then
     pacstrap -K "$rootfs_dir" base
   else
     #im sure theres a million better ways to do this
