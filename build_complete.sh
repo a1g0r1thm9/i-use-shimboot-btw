@@ -88,7 +88,7 @@ if [ "$(check_deps "$needed_deps")" ]; then
     fi
     create_aliases
   elif [ "$(pacman --help)" ]; then
-    pacman -Syu --needed --noconfirm wget python3 unzip zip debootstrap cpio binwalk kmod pv lz4 cryptsetup bsdtar
+    pacman -Syu --needed --noconfirm "wget python3 unzip zip debootstrap cpio binwalk kmod pv lz4 cryptsetup libarchive-tools"
     if [ "$(check_deps "cgpt")" ]; then
       #waiter waiter more unnecessary oneliners please
       command -v yay >/dev/null 2>&1 && sudo -u "$SUDO_USER" yay -S --noconfirm cgpt-bin || (command -v paru >/dev/null 2>&1 && sudo -u "$SUDO_USER" paru -S --noconfirm cgpt-bin) || { print_error "install an aur helper you freak"; exit 1; }
