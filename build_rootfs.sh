@@ -92,7 +92,7 @@ elif [ "$distro" = "arch" ]; then
   if [ "$arch" == "x86_64" -o "$arch" == "amd64" ]; then    arch_mirror="https://mirror.rackspace.com/archlinux"
     if [ ! -f "$tarfile" ]; then
       latest_tarball="$(wget -qO- "$arch_mirror/iso/latest/" | grep -oE 'archlinux-bootstrap-[0-9.]+-x86_64\.tar\.zst' | head -n1)"
-      wget -q --show-progress "$arch_mirror/iso/latest/$latest_tarball" -O "$tarfile"
+      wget -q "$arch_mirror/iso/latest/$latest_tarball" -O "$tarfile"
     fi
     mkdir -p "$rootfs_dir/etc/pacman.d/"
     echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > "$rootfs_dir/etc/pacman.d/mirrorlist"
@@ -100,7 +100,7 @@ elif [ "$distro" = "arch" ]; then
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
     if [ ! -f "$tarfile" ]; then
       latest_tarball="$(wget -qO- "$alarm_mirror/os/" | grep -oE 'ArchLinuxARM-aarch64-latest\.tar\.gz' | head -n1)"
-      wget -q --show-progress "$alarm_mirror/os/$latest_tarball" -O "$tarfile"
+      wget -q "$alarm_mirror/os/$latest_tarball" -O "$tarfile"
     fi
   fi
   #alarm image has file attributes that dont play nice with gnu tar
@@ -139,7 +139,7 @@ mkdir -p "/var/cache/pacman/pkg"
 #youtube.com/watch?v=02kGt4DEW30&t=30s
 systemd-nspawn -D "$rootfs_dir" --console=pipe \
   --bind=/var/cache/pacman/pkg \
-  /bin/bash -c "${chroot_command}"
+  /bin/sh -c "${chroot_command}"
 
 echo clean > "$indicator_file"
 print_info "rootfs has been created"
