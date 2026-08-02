@@ -63,7 +63,12 @@ elif [ "$distro" = "ubuntu" ]; then
 
 elif [ "$distro" = "alpine" ]; then
   print_info "downloading alpine package list"
-  pkg_list_url="https://dl-cdn.alpinelinux.org/alpine/latest-stable/main/x86_64/"
+  if [ $(uname -m) == "x86_64" ]; then
+    host_arch="x86_64"
+  else
+    host_arch="aarch64"
+  fi
+  pkg_list_url="https://dl-cdn.alpinelinux.org/alpine/latest-stable/main/$host_arch/"
   pkg_data="$(wget -qO- --show-progress "$pkg_list_url" | grep "apk-tools-static")"
   pkg_url="$pkg_list_url$(echo "$pkg_data" | pcregrep -o1 '"(.+?.apk)"')"
 
