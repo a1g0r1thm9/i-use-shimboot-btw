@@ -35,7 +35,6 @@ else
   echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist
   pacman-key --populate archlinux
 fi
-
 if [ ! "$disable_base_pkgs" ]; then
   pacman -Syu --needed --noconfirm --disable-sandbox meson ninja cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
 
@@ -51,20 +50,22 @@ if [ ! "$disable_base_pkgs" ]; then
       git sparse-checkout set core/systemd
       git checkout master
     )
+    pkgbuild_dir="$systemd_pkg_dir/core/systemd"
   else
     git clone --depth 1 --branch main \
       https://gitlab.archlinux.org/archlinux/packaging/packages/systemd.git \
       "$systemd_pkg_dir"
+    pkgbuild_dir="$systemd_pkg_dir"
   fi
 
-  if grep -qE '^prepare[[:space:]]*\(\)[[:space:]]*\{' "$systemd_pkg_dir/PKGBUILD"; then
+  if grep -qE '^prepare[[:space:]]*\(\)[[:space:]]*\{' "$pkgbuild_dir/PKGBUILD"; then
     sed -i -E 's/^prepare[[:space:]]*\(\)[[:space:]]*\{/_orig_prepare() {/' \
-      "$systemd_pkg_dir/PKGBUILD"
+      "$pkgbuild_dir/PKGBUILD"
   else
-    echo '_orig_prepare() { :; }' >> "$systemd_pkg_dir/PKGBUILD"
+    echo '_orig_prepare() { :; }' >> "$pkgbuild_dir/PKGBUILD"
   fi
 
-  cat >> "$systemd_pkg_dir/PKGBUILD" <<'PKGEOF'
+  cat >> "$pkgbuild_dir/PKGBUILD" <<'PKGEOF'
 
 prepare() {
   _orig_prepare
@@ -81,14 +82,15 @@ PKGEOF
 
   useradd -m builder 2>/dev/null || true
   chown -R builder:builder /opt/systemd-cros
-  echo "builder ALL=(ALL) NOPASSWD: /usr/bin/pacman" > /etc/sudoers.d/builder-pacman
-  chmod 0440 /etc/sudoers.d/builder-pacman
+  makedepends_list="$(bash -c "source '$pkgbuild_dir/PKGBUILD'; printf '%s\n' \"\${makedepends[@]}\"")"
+  if [ -n "$makedepends_list" ]; then
+    # shellcheck disable=SC2086
+    pacman -S --needed --noconfirm $makedepends_list
+  fi
 
-  cd "$systemd_pkg_dir"
+  cd "$pkgbuild_dir"
   sudo -u builder makepkg -s --noconfirm --skippgpcheck --ignorearch
-  pacman -U --noconfirm systemd-*.pkg.tar.zst
-
-  rm -f /etc/sudoers.d/builder-pacman
+  pacman -U --noconfirm "$pkgbuild_dir"/systemd-*.pkg.tar.zst
 fi
 
 #set up hostname and username
