@@ -58,7 +58,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get upgrade -y
-          sudo DEBUG=1 ./build_complete.sh ${{ matrix.board }} compress_img=1 quiet=1 distro='arch' desktop='kde'
+          sudo DEBUG=1 ./build_complete.sh ${{ matrix.board }} compress_img=1 quiet=1 distro='alpine'
 
       - name: upload img
         uses: actions/upload-artifact@v4
@@ -66,9 +66,8 @@ jobs:
           name: shimboot_${{ matrix.board }}
           path: data/shimboot_${{ matrix.board }}.bin
           compression-level: 7
-  
       - name: create release
-        uses: softprops/action-gh-release@v1
+        uses: ading2210/gh-large-releases@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           draft: true
