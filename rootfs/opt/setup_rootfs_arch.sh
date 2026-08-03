@@ -27,8 +27,10 @@ systemctl enable kill-frecon.service
 
 pacman-key --init
 if [ "$arch" == "arm64" ]; then
+  echo 'Server = http://mirror.archlinuxarm.org/$arch/$repo' > /etc/pacman.d/mirrorlist
   pacman-key --populate archlinuxarm
 else
+  echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist
   pacman-key --populate archlinux
 fi
 

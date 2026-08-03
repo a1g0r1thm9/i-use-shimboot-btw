@@ -109,10 +109,6 @@ elif [ "$distro" = "arch" ]; then
   fi
   #alarm image has file attributes that dont play nice with gnu tar
   bsdtar -xpf "$tarfile" --numeric-owner -C "$rootfs_dir" --strip-components=1
-  if [ "$distro" == "arch" -a "$arch" != "x86_64" ]; then
-    mkdir -p "$rootfs_dir/etc/pacman.d/"
-    echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > "$rootfs_dir/etc/pacman.d/mirrorlist"
-  fi
   chown root:root "$rootfs_dir/etc"
   rm -f "$rootfs_dir/etc/resolv.conf"
   touch "$rootfs_dir/etc/resolv.conf"
