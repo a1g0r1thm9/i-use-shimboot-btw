@@ -94,13 +94,12 @@ elif [ "$distro" = "alpine" ]; then
   chroot_script="/opt/setup_rootfs_alpine.sh"
 elif [ "$distro" = "arch" ]; then
   tarfile="$(realpath .)/rootfs-$arch.tar.gz"
-  if [ "$arch" == "x86_64" -o "$arch" == "amd64" ]; then    arch_mirror="https://mirror.rackspace.com/archlinux"
+  if [ "$arch" == "x86_64" -o "$arch" == "amd64" ]; then
+    arch_mirror="https://mirror.rackspace.com/archlinux"
     if [ ! -f "$tarfile" ]; then
       latest_tarball="$(wget -qO- "$arch_mirror/iso/latest/" | grep -oE 'archlinux-bootstrap-[0-9.]+-x86_64\.tar\.zst' | head -n1)"
       wget -q "$arch_mirror/iso/latest/$latest_tarball" -O "$tarfile"
     fi
-    mkdir -p "$rootfs_dir/etc/pacman.d/"
-    echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > "$rootfs_dir/etc/pacman.d/mirrorlist"
   else
     alarm_mirror="http://ca.us.mirror.archlinuxarm.org"
     if [ ! -f "$tarfile" ]; then
@@ -110,7 +109,10 @@ elif [ "$distro" = "arch" ]; then
   fi
   #alarm image has file attributes that dont play nice with gnu tar
   bsdtar -xpf "$tarfile" --numeric-owner -C "$rootfs_dir" --strip-components=1
-
+  if [ "$distro" == "arch" -a "$arch" != "x86_64" ]; then
+    mkdir -p "$rootfs_dir/etc/pacman.d/"
+    echo 'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' > "$rootfs_dir/etc/pacman.d/mirrorlist"
+  fi
   chown root:root "$rootfs_dir/etc"
   rm -f "$rootfs_dir/etc/resolv.conf"
   touch "$rootfs_dir/etc/resolv.conf"
@@ -123,6 +125,7 @@ fi
 
 print_info "copying rootfs setup scripts"
 cp -arv rootfs/* "$rootfs_dir"
+chown root:root "$rootfs_dir/opt/systemd-cros"
 
 
 hostname="${args['hostname']}"

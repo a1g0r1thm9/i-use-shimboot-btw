@@ -25,23 +25,54 @@ arch="${10}"
 #enable shimboot services
 systemctl enable kill-frecon.service
 
+pacman-key --init
 if [ "$arch" == "arm64" ]; then
-  pacman-key --init
   pacman-key --populate archlinuxarm
+else
+  pacman-key --populate archlinux
 fi
 
-#install base packages
 if [ ! "$disable_base_pkgs" ]; then
   pacman -Syu --needed --noconfirm --disable-sandbox meson ninja cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
-  cd /opt/systemd-shimboot
+
+  #bum off arch packaging
+  systemd_pkg_dir=/opt/systemd-cros/systemd-pkg
+  rm -rf "$systemd_pkg_dir"
+  git clone --depth 1 --branch main \
+    https://gitlab.archlinux.org/archlinux/packaging/packages/systemd.git \
+    "$systemd_pkg_dir"
+
+  #ts some unixxy bullshit
+  if grep -qE '^prepare[[:space:]]*\(\)[[:space:]]*\{' "$systemd_pkg_dir/PKGBUILD"; then
+    sed -i -E 's/^prepare[[:space:]]*\(\)[[:space:]]*\{/_orig_prepare() {/' \
+      "$systemd_pkg_dir/PKGBUILD"
+  else
+    echo '_orig_prepare() { :; }' >> "$systemd_pkg_dir/PKGBUILD"
+  fi
+
+  cat >> "$systemd_pkg_dir/PKGBUILD" <<'PKGEOF'
+
+prepare() {
+  _orig_prepare
+  local mp src_root
+  mp="$(find "$srcdir" -type f -path '*/src/basic/mountpoint-util.c' | head -n1)"
+  if [ -z "$mp" ]; then
+    echo "shimboot: could not locate mountpoint-util.c under \$srcdir" >&2
+    exit 1
+  fi
+  src_root="$(dirname "$(dirname "$(dirname "$mp")")")"
+  patch -d "$src_root" -Np1 < /opt/systemd-cros/shimboot.patch
+}
+PKGEOF
+
   useradd -m builder 2>/dev/null || true
-  chown -R builder:builder /opt/systemd-shimboot
+  chown -R builder:builder /opt/systemd-cros
+  #mossad-mandated security hole
+  echo "builder ALL=(ALL) NOPASSWD: /usr/bin/pacman" > /etc/sudoers.d/builder-pacman
+  chmod 0440 /etc/sudoers.d/builder-pacman
+  cd "$systemd_pkg_dir"
   sudo -u builder makepkg -s --noconfirm --skippgpcheck
   pacman -U --noconfirm systemd-*.pkg.tar.zst
-  #set up zram
-  #echo "ALGO=lzo" >> /etc/default/zramswap
-  #echo "PERCENT=100" >> /etc/default/zramswap
-
 fi
 
 #set up hostname and username
