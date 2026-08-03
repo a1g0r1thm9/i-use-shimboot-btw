@@ -90,7 +90,18 @@ PKGEOF
 
   cd "$pkgbuild_dir"
   sudo -u builder makepkg -s --noconfirm --skippgpcheck --ignorearch
-  pacman -U --noconfirm "$pkgbuild_dir"/systemd-*.pkg.tar.zst
+  pkgdest="$(bash -c 'source /etc/makepkg.conf 2>/dev/null; echo "$PKGDEST"')"
+  search_dirs=("$pkgbuild_dir")
+  [ -n "$pkgdest" ] && search_dirs+=("$pkgdest")
+
+  mapfile -t built_pkgs < <(find "${search_dirs[@]}" -maxdepth 1 -name 'systemd-*.pkg.tar.*' 2>/dev/null)
+
+  if [ "${#built_pkgs[@]}" -eq 0 ]; then
+    echo "shimboot: could not find built systemd*.pkg.tar.* packages after makepkg" >&2
+    exit 1
+  fi
+
+  pacman -U --noconfirm "${built_pkgs[@]}"
 fi
 
 #set up hostname and username
