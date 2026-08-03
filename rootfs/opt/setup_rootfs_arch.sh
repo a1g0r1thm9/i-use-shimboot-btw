@@ -24,7 +24,9 @@ arch="${10}"
 
 #enable shimboot services
 systemctl enable kill-frecon.service
-
+if ! grep -q '^DisableSandbox' /etc/pacman.conf; then
+  sed -i '/^\[options\]/a DisableSandbox' /etc/pacman.conf
+fi
 pacman-key --init
 if [ "$arch" == "arm64" ]; then
   echo 'Server = http://mirror.archlinuxarm.org/$arch/$repo' > /etc/pacman.d/mirrorlist
@@ -37,14 +39,24 @@ fi
 if [ ! "$disable_base_pkgs" ]; then
   pacman -Syu --needed --noconfirm --disable-sandbox meson ninja cloud-utils zram-generator sudo base-devel bash-completion btop firefox mpv gparted fastfetch git 7zip unrar tree net-tools pacman-contrib
 
-  #bum off arch packaging
   systemd_pkg_dir=/opt/systemd-cros/systemd-pkg
   rm -rf "$systemd_pkg_dir"
-  git clone --depth 1 --branch main \
-    https://gitlab.archlinux.org/archlinux/packaging/packages/systemd.git \
-    "$systemd_pkg_dir"
 
-  #ts some unixxy bullshit
+  if [ "$arch" == "arm64" ]; then
+    git clone --filter=blob:none --no-checkout --depth 1 \
+      https://github.com/archlinuxarm/PKGBUILDs.git "$systemd_pkg_dir"
+    (
+      cd "$systemd_pkg_dir"
+      git sparse-checkout init --cone
+      git sparse-checkout set core/systemd
+      git checkout master
+    )
+  else
+    git clone --depth 1 --branch main \
+      https://gitlab.archlinux.org/archlinux/packaging/packages/systemd.git \
+      "$systemd_pkg_dir"
+  fi
+
   if grep -qE '^prepare[[:space:]]*\(\)[[:space:]]*\{' "$systemd_pkg_dir/PKGBUILD"; then
     sed -i -E 's/^prepare[[:space:]]*\(\)[[:space:]]*\{/_orig_prepare() {/' \
       "$systemd_pkg_dir/PKGBUILD"
@@ -69,12 +81,14 @@ PKGEOF
 
   useradd -m builder 2>/dev/null || true
   chown -R builder:builder /opt/systemd-cros
-  #mossad-mandated security hole
   echo "builder ALL=(ALL) NOPASSWD: /usr/bin/pacman" > /etc/sudoers.d/builder-pacman
   chmod 0440 /etc/sudoers.d/builder-pacman
+
   cd "$systemd_pkg_dir"
-  sudo -u builder makepkg -s --noconfirm --skippgpcheck
+  sudo -u builder makepkg -s --noconfirm --skippgpcheck --ignorearch
   pacman -U --noconfirm systemd-*.pkg.tar.zst
+
+  rm -f /etc/sudoers.d/builder-pacman
 fi
 
 #set up hostname and username
